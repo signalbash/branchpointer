@@ -1,0 +1,3 @@
+id	chromosome	start	end	strand
+BRCA1_intron	chr17	43106534	43106634	-
+BRCA2_intron	chr13	32376570	32376669	+

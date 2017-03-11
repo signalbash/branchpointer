@@ -1,0 +1,33 @@
+Version 0.99.0
+
+Pre-BioC submission
+
+Version 0.99.1
+
+Changed GTF reading to use rtracklayer::import
+
+Version 0.99.2
+Changed VignetteEngine so vignette can be built
+
+Version 0.99.3
+Removed pdf
+
+Version 0.99.4
+Changed Vignette to .Rnw to generate BiocStyle output
+
+Version 0.99.5
+UTF8 encoding in vignette to pass build
+
+Version 0.99.6
+depends R>3.4
+
+Version 0.99.7
+Branchpointer now is based upon the GRanges object class.
+Several functions have been combined and made into helper functions.
+Naming conventions of variables is consistent.
+
+Version 0.99.8-0.99.9
+Updated functions to use GRanges accessor functions
+
+Version 0.99.10-0.99.11
+Updated functions
