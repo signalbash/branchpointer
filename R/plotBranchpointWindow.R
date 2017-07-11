@@ -8,12 +8,7 @@
 #' whereas \code{"withExon"} will plot all transcripts containing the exon.
 #' @return ggplot2 plot transcript structures
 #' @import ggplot2
-#' @export
-#' @examples
-#' smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",
-#' package = "branchpointer")
-#' exons <- gtfToExons(smallExons)
-#' plotStructure(exonID = "ENSE00001184784.4", exons)
+#' @keywords internal
 #' @author Beth Signal
 plotStructure <- function(exonID, exons, keepTranscripts="overlapping"){
   
@@ -118,22 +113,22 @@ plotStructure <- function(exonID, exons, keepTranscripts="overlapping"){
 #' @importFrom cowplot ggdraw
 #' @importFrom cowplot draw_plot
 #' @examples
-#' smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",package = "branchpointer")
+#' smallExons <- system.file("extdata","gencode.v26.annotation.small.gtf",
+#' package = "branchpointer")
 #' exons <- gtfToExons(smallExons)
-#' genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+#' g <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 #'
-#' querySNP <- system.file("extdata","SNP_example.txt", package = "branchpointer")
-#' query <- readQueryFile(querySNP,queryType = "SNP")
-#' query <- getQueryLoc(query,queryType = "SNP",exons = exons, filter = FALSE)
-#' 
-#' predictions <- predictBranchpoints(query,queryType = "SNP", BSgenome = genome)
-#' plotBranchpointWindow(query$id[1], predictions,
+#' querySNPFile <- system.file("extdata","SNP_example.txt", package = "branchpointer")
+#' querySNP <- readQueryFile(querySNPFile,queryType = "SNP",exons = exons, filter = FALSE)
+#' predictionsSNP <- predictBranchpoints(querySNP,queryType = "SNP",BSgenome = g)
+
+#' plotBranchpointWindow(querySNP$id[1], predictionsSNP,
 #' plotMutated = TRUE, exons = exons)
 #' @author Beth Signal
 
 plotBranchpointWindow <- function(queryName,
                                  predictions,
-                                 probabilityCutoff = 0.5,
+                                 probabilityCutoff = 0.52,
                                  plotMutated = FALSE,
                                  plotStructure = TRUE,
                                  exons) {

@@ -24,18 +24,18 @@ getCanonical3SS <- function(ag){
 #' Takes a query genomic sequence, finds all potential polypyramidine tracts (PPTs)
 #' between the test site and the annotated 3'exon.
 #' Returns the distance to the start of the longest PPT, and its length.
-#' @param attributesLine line from a query attributes GenomicRanges
+#' @param attributes query attributes GenomicRanges
 #' @return distance to the start of the longest PPT, and its length
 #' @import plyr
 #' @keywords internal
 #' @author Beth Signal
 
-getPPT <- function(attributesLine){
+getPPT <- function(attributes){
 
-  dist3prime <- as.numeric(attributesLine$to_3prime_point)
+  dist3prime <- as.numeric(attributes$to_3prime_point)
 
   #get sequence between the tested site and 3'exon
-  seq <- substr(attributesLine$seq, 251, (250 + dist3prime))
+  seq <- substr(attributes$seq, 251, (250 + dist3prime))
   seq <- unlist(strsplit(seq, ""))
 
   pyramidines <- which(seq == "T" | seq == "C")
@@ -188,6 +188,8 @@ getPPT <- function(attributesLine){
 #' @importFrom Biostrings getSeq
 #' @importFrom BSgenome.Hsapiens.UCSC.hg38 BSgenome.Hsapiens.UCSC.hg38
 #' @importFrom data.table fread
+#' @importFrom GenomeInfoDb seqlevels
+#' @importFrom GenomeInfoDb seqnames
 #' @importClassesFrom data.table data.table
 #' @keywords internal
 #' @author Beth Signal
@@ -201,7 +203,7 @@ getBranchpointSequence <- function(query, uniqueId = "test",
                                    useParallel = FALSE,
                                    cores = 1,
                                    rmChr = FALSE) {
-
+  
   if(is.na(genome) & is.null(BSgenome)){
     stop("please specify a genome .fa file for sequence extraction or specify a BSgenome object")
   }
@@ -266,22 +268,54 @@ getBranchpointSequence <- function(query, uniqueId = "test",
       " -bed ",workingDirectory,"/mutation_",uniqueId,".bed -fo ",
       workingDirectory,"/mutation_",uniqueId,".fa -name -s")
     system(cmd)
-    fasta <-
-      data.table::fread(paste0(workingDirectory,"/mutation_",uniqueId,".fa"),
-                        header = FALSE, stringsAsFactors = FALSE)
-    fasta <- as.data.frame(fasta)
-    system(paste0("rm -f ",workingDirectory,"/mutation_",uniqueId,"*"))
-
-    s <- fasta[seq(2,dim(fasta)[1],by = 2),1]
-    mcols(query)$seq <- s
+    
+    info <- file.info(paste0(workingDirectory,"/mutation_",uniqueId,".fa"))
+    if(info$size > 0){
+      fasta <-
+        data.table::fread(paste0(workingDirectory,"/mutation_",uniqueId,".fa"),
+                          header = FALSE, stringsAsFactors = FALSE)
+      fasta <- as.data.frame(fasta)
+      system(paste0("rm -f ",workingDirectory,"/mutation_",uniqueId,"*"))
+  
+      s <- fasta[seq(2,dim(fasta)[1],by = 2),1]
+      mcols(query)$seq <- s
+    }else{
+      stop("cannot retrieve fa sequence, please check your exon annotation and genome .fa")
+    }
 
   }else{
     # need to +1 for BSgenomes sequence retreval
     # ranges given are bedtools (legacy)
+    
     start(ranges(bed)) <- start(ranges(bed)) +1
     width(ranges(bed))  <- 528
-
-    bed.seq <- Biostrings::getSeq(BSgenome, bed)
+    
+    # check if chromosomes need to renamed
+    seqlevels.genome <- GenomeInfoDb::seqlevels(BSgenome)
+    seqlevels.bed <- GenomeInfoDb::seqlevels(bed)
+    
+    # used chromosomes 
+    seqnames.bed <- as.character(GenomeInfoDb::seqnames(bed))
+    
+    if(!(all(seqnames.bed %in% seqlevels.genome))){
+      
+      # try adding/removing chr from bed
+      if(!all(stringr::str_sub(seqlevels.bed, 1, 3) == "chr")){
+         GenomeInfoDb::seqlevels(bed) <- paste0("chr", seqlevels.bed)
+      }else if(all(stringr::str_sub(seqlevels.bed, 1, 3) == "chr")){
+         GenomeInfoDb::seqlevels(bed) <- gsub("chr", "", seqlevels.bed)
+      }
+      
+      seqlevels.bed <- GenomeInfoDb::seqlevels(bed)
+      seqnames.bed <- as.character(GenomeInfoDb::seqnames(bed))
+      
+      # if that doesn't fix the issue, break
+      if(!(all(seqnames.bed %in% seqlevels.genome))){
+        stop("Chromosome names of query and genome do not match")
+      }
+    }
+    
+    bed.seq <- suppressWarnings(Biostrings::getSeq(BSgenome, bed))
     mcols(query)$seq <- as.character(bed.seq)
   }
 
@@ -313,6 +347,8 @@ getBranchpointSequence <- function(query, uniqueId = "test",
       }
       message("removing from analysis")
       query <- query[-rm]
+      nt.ref <- nt.ref[-rm]
+      nt.alt <- nt.alt[-rm]
     }
   }
 
@@ -336,8 +372,8 @@ getBranchpointSequence <- function(query, uniqueId = "test",
                                               (as.numeric(x[2])-17),
                                               (as.numeric(x[2])-17) + 500))
 
-    queryAllPoints <- do.call("c",as.list(rep(query, 27)))
-    queryAllPoints <- do.call("c",as.list(rep(queryAllPoints, 2)))
+    queryAllPoints <- rep(query, 27)
+    queryAllPoints <- rep(queryAllPoints, 2)
 
     mcols(queryAllPoints)$status <- c(rep("REF", length(seqs)),
                                                rep("ALT", length(seqs.mut)))
@@ -398,7 +434,7 @@ getBranchpointSequence <- function(query, uniqueId = "test",
     cluster <- parallel::makeCluster(cores)
     canonHits <- parallel::parLapply(cluster,f, getCanonical3SS)
     pyra <-
-      parallel::parApply(cluster,queryAllPoints, 1, getPPT)
+        parallel::parLapply(cluster,queryAllPoints, getPPT)
     parallel::stopCluster(cluster)
   }else{
     canonHits <- lapply(f, getCanonical3SS)
@@ -445,15 +481,14 @@ getBranchpointSequence <- function(query, uniqueId = "test",
 #' @import parallel
 #' @importFrom stringr str_sub
 #' @examples
-#' smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",
+#' smallExons <- system.file("extdata","gencode.v26.annotation.small.gtf",
 #' package = "branchpointer")
 #' exons <- gtfToExons(smallExons)
-#' genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+#' g <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 #'
-#' querySNP <- system.file("extdata","SNP_example.txt", package = "branchpointer")
-#' query <- readQueryFile(querySNP,queryType = "SNP")
-#' query <- getQueryLoc(query,queryType = "SNP",exons = exons, filter = FALSE)
-#' predictions <- predictBranchpoints(query,queryType = "SNP",BSgenome = genome)
+#' querySNPFile <- system.file("extdata","SNP_example.txt", package = "branchpointer")
+#' querySNP <- readQueryFile(querySNPFile,queryType = "SNP",exons = exons, filter = FALSE)
+#' predictionsSNP <- predictBranchpoints(querySNP,queryType = "SNP",BSgenome = g)
 #' @author Beth Signal
 
 predictBranchpoints <- function(query, uniqueId = "test",
@@ -544,40 +579,19 @@ predictBranchpoints <- function(query, uniqueId = "test",
     queryAttributes.forModel[,n] <- as.numeric(queryAttributes.forModel[,n])
   }
 
-  #SVM prediction feature
-  newFeat <- kernlab::predict(branchpointer.svm,
-                              queryAttributes.forModel, "probabilities")
-  newFeat <- newFeat[,1]
-
-  queryAttributes.forModel <- cbind(queryAttributes.forModel, newFeat)
-
   #gbm prediction
-  p <- predict(object = branchpointer.gbm,
-               queryAttributes.forModel[,predictorNames],"prob")
+  p <- predict(object = branchpointer2.gbm,
+               queryAttributes.forModel,"prob")
 
   #reconfigure
-
   mcols(queryAttributes)$branchpoint_prob <- p[,1]
-
+  
   #### U2 binding energy###
   m <- match(colnames(U2_binding_df)[-c(1:3)],colnames(mcols(queryAttributes)))
-
-  if(useParallel){
-    cluster <- parallel::makeCluster(cores)
-    U2Eightmers <- parallel::parApply(cluster,as.data.frame(mcols(queryAttributes)[,m]),1,paste, collapse="")
-    parallel::stopCluster(cluster)
-  }else{
-    #needs as.data.frame to treat rows as vectors
-    U2Eightmers <- apply(as.data.frame(mcols(queryAttributes)[,m]),1,paste, collapse="")
-  }
-
+  U2Eightmers <- do.call(paste0, as.data.frame(mcols(queryAttributes)[,m]))
+  
   x <- match(U2Eightmers, U2_binding_df$eightmers)
   mcols(queryAttributes)$U2_binding_energy <- U2_binding_df$energy[x]
-
-
-  #branchpointPred$id <- stringr::str_sub(branchpointPred$id,1,-8)
-  #branchpointPred <- branchpointPred[order(branchpointPred[,1], branchpointPred[,5], branchpointPred[,4]),]
-  #colnames(branchpointPred)[which(colnames(branchpointPred) == "seq_pos0")] <- "nucleotide"
 
   return(queryAttributes)
 }

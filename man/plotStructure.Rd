@@ -21,12 +21,7 @@ ggplot2 plot transcript structures
 \description{
 Plots transcript structures
 }
-\examples{
-smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",
-package = "branchpointer")
-exons <- gtfToExons(smallExons)
-plotStructure(exonID = "ENSE00001184784.4", exons)
-}
 \author{
 Beth Signal
 }
+\keyword{internal}

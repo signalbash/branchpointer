@@ -1,4 +1,3 @@
 id	chromosome	chrom_start	strand	ref_allele	alt_allele
-rs17000647	chr4	75556520	+	C	A
-rs5031002	chrX	67722783	+	G	A
-rs998731	chr8	80183160	-	C	T
+rs786205083	chr2	71590178	+	A	G
+rs587776767	chr11	2165787	-	A	T

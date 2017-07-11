@@ -37,15 +37,14 @@ GenomicRanges object with branchpoint probaility scores for each site in query
 predicts branchpoint probability scores for each query site.
 }
 \examples{
-smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",
+smallExons <- system.file("extdata","gencode.v26.annotation.small.gtf",
 package = "branchpointer")
 exons <- gtfToExons(smallExons)
-genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+g <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 
-querySNP <- system.file("extdata","SNP_example.txt", package = "branchpointer")
-query <- readQueryFile(querySNP,queryType = "SNP")
-query <- getQueryLoc(query,queryType = "SNP",exons = exons, filter = FALSE)
-predictions <- predictBranchpoints(query,queryType = "SNP",BSgenome = genome)
+querySNPFile <- system.file("extdata","SNP_example.txt", package = "branchpointer")
+querySNP <- readQueryFile(querySNPFile,queryType = "SNP",exons = exons, filter = FALSE)
+predictionsSNP <- predictBranchpoints(querySNP,queryType = "SNP",BSgenome = g)
 }
 \author{
 Beth Signal

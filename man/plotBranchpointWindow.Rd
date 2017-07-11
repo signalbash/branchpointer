@@ -4,7 +4,7 @@
 \alias{plotBranchpointWindow}
 \title{Plots branchpointer predictions}
 \usage{
-plotBranchpointWindow(queryName, predictions, probabilityCutoff = 0.5,
+plotBranchpointWindow(queryName, predictions, probabilityCutoff = 0.52,
   plotMutated = FALSE, plotStructure = TRUE, exons)
 }
 \arguments{
@@ -28,16 +28,15 @@ ggplot2 plot with branchpoint features in the specified intronic region
 Plots branchpointer predictions
 }
 \examples{
-smallExons <- system.file("extdata","gencode.v24.annotation.small.gtf",package = "branchpointer")
+smallExons <- system.file("extdata","gencode.v26.annotation.small.gtf",
+package = "branchpointer")
 exons <- gtfToExons(smallExons)
-genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+g <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 
-querySNP <- system.file("extdata","SNP_example.txt", package = "branchpointer")
-query <- readQueryFile(querySNP,queryType = "SNP")
-query <- getQueryLoc(query,queryType = "SNP",exons = exons, filter = FALSE)
-
-predictions <- predictBranchpoints(query,queryType = "SNP", BSgenome = genome)
-plotBranchpointWindow(query$id[1], predictions,
+querySNPFile <- system.file("extdata","SNP_example.txt", package = "branchpointer")
+querySNP <- readQueryFile(querySNPFile,queryType = "SNP",exons = exons, filter = FALSE)
+predictionsSNP <- predictBranchpoints(querySNP,queryType = "SNP",BSgenome = g)
+plotBranchpointWindow(querySNP$id[1], predictionsSNP,
 plotMutated = TRUE, exons = exons)
 }
 \author{

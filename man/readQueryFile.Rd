@@ -4,29 +4,39 @@
 \alias{readQueryFile}
 \title{Read a query file}
 \usage{
-readQueryFile(queryFile, queryType)
+readQueryFile(queryFile, queryType, exons, maxDist = 50, filter = TRUE)
 }
 \arguments{
 \item{queryFile}{tab delimited file containing query information.
-For intronic regions should be in the format: region id, chromosome name, region start, region id, strand.
+For intronic regions should be in the format: region id, chromosome name, region start, region end, strand.
 For SNP variants should be in the format: SNP id, chromosome name, SNP position, strand, reference allele (A/T/C/G), alternative allele (A/T/C/G)}
 
 \item{queryType}{type of query file (\code{"SNP"} or \code{"region"})}
+
+\item{exons}{GRanges containing exon co-ordinates.
+Should be produced by gtfToExons()}
+
+\item{maxDist}{maximum distance a SNP can be from an annotated 3' exon.}
+
+\item{filter}{remove SNP queries prior to finding finding nearest exons.}
 }
 \value{
-data.frame with formatted query
+Formatted query GRanges
 }
 \description{
-Reads and formats a query file, generated from snpToQuery, or manually generated.
+Reads and formats a manually generated query file, and finds realtive locations of the closest annotated exons
 Converts unstranded SNPs to two entries for each strand.
 Checks for duplicate names and replaces if found.
 }
 \examples{
-querySNP <- system.file("extdata","SNP_example.txt", package = "branchpointer")
-query <- readQueryFile(querySNP,queryType = "SNP")
+smallExons <- system.file("extdata","gencode.v26.annotation.small.gtf", package = "branchpointer")
+exons <- gtfToExons(smallExons)
 
-queryIntron <- system.file("extdata","intron_example.txt", package = "branchpointer")
-query <- readQueryFile(queryIntron,queryType = "region")
+querySNPFile <- system.file("extdata","SNP_example.txt", package = "branchpointer")
+querySNP <- readQueryFile(querySNPFile, queryType = "SNP", exons)
+
+queryIntronFile <- system.file("extdata","intron_example.txt", package = "branchpointer")
+queryIntron <- readQueryFile(queryIntronFile,queryType = "region", exons)
 }
 \author{
 Beth Signal

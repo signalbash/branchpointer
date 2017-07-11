@@ -5,15 +5,13 @@
 ###### download files ######
 
 # download GTF and .fa files
-system("wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_24/gencode.v24.annotation.gtf.gz")
-system("wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_24/GRCh38.p5.genome.fa.gz")
-system("gunzip gencode.v24.annotation.gtf.gz")
-system("gunzip GRCh38.p5.genome.fa.gz")
+system("wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_21/gencode.v21.annotation.gtf.gz")
+system("gunzip gencode.v21.annotation.gtf.gz")
 
 # download NHGRI GWAS file
-# date: 22/08/16
-system("wget https://www.ebi.ac.uk/gwas/api/search/downloads/full -O gwas_catalog_v1.0.1-associations_e85-r2016-08-14.tsv")
-
+# date: 26/06/17
+system("wget https://www.ebi.ac.uk/gwas/api/search/downloads/full")
+system("mv full gwas_catalog_v1.0-associations_e89_r2017-06-19.tsv")
 ###### run branchpointer ######
 
 library(biomaRt)
@@ -22,43 +20,77 @@ library(branchpointer)
 options(stringsAsFactors = FALSE)
 options(scipen = 999)
 
-# location of the bedtools binary file
-# to find location type "which bedtools" in the command line
-bedtools <-  "/Applications/apps/bedtools2/bin/bedtools"
-
-# format exon annotation
-exons <- gtfToExons("gencode.v24.annotation.gtf")
+mart.snp <- useMart("ENSEMBL_MART_SNP", dataset="hsapiens_snp",host="www.ensembl.org")
 
 # read in GWAS annotation
-NHGRI_GWAS <- read.delim("gwas_catalog_v1.0.1-associations_e85-r2016-08-14.tsv",
+NHGRI_GWAS <- read.delim("gwas_catalog_v1.0-associations_e89_r2017-06-19.tsv",
                          stringsAsFactors = FALSE)
 
-# convert 'intron_variant' rs ids to query format
-mart.snp <- useMart("ENSEMBL_MART_SNP", dataset = "hsapiens_snp")
-query <- snpToQuery(NHGRI_GWAS$SNPS[NHGRI_GWAS$CONTEXT == "intron_variant"],
-                    mart.snp=mart.snp)
+# manually create table -- biomaRt queries are slow & unreliable for large numbers
+NHGRI_GWAS$allele <- NA
+NHGRI_GWAS_filtered <- NHGRI_GWAS[-grep(";", NHGRI_GWAS$SNPS),]
+NHGRI_GWAS_filtered <- NHGRI_GWAS_filtered[!duplicated(NHGRI_GWAS_filtered$SNPS),]
 
-# get location of SNPs
-query <- getQueryLoc(query,queryType = "SNP",
-                     exons = exons, filter = TRUE)
+
+# queries of size 1000
+split_size <- 1000
+splits <- ceiling(nrow(NHGRI_GWAS_filtered) / split_size)
+
+for(s in 1:splits){
+
+  end_index <- s * split_size
+  start_index <- end_index - (split_size - 1)
+  end_index <- min(end_index, nrow(NHGRI_GWAS_filtered))
+  
+  snpInfo <- biomaRt::getBM(attributes = c("refsnp_id",'refsnp_source', "chr_name",
+                                           "chrom_start", "allele"),
+                            filters = "snp_filter", values = NHGRI_GWAS_filtered$SNPS[start_index:end_index], mart = mart.snp)
+
+  m <- match(snpInfo$refsnp_id, NHGRI_GWAS_filtered$SNPS)
+  NHGRI_GWAS_filtered$allele[m] <- snpInfo$allele
+  
+  message(s)
+}
+
+# check alleles -- only SNPs wanted
+NHGRI_GWAS_filtered <- NHGRI_GWAS_filtered[which(!is.na(NHGRI_GWAS_filtered$allele)),]
+NHGRI_GWAS_filtered$allele_ref <- unlist(lapply(stringr::str_split(NHGRI_GWAS_filtered$allele, "/"), "[[", 1))
+NHGRI_GWAS_filtered <- NHGRI_GWAS_filtered[NHGRI_GWAS_filtered$allele_ref %in% c("A","C","G","T"),]
+NHGRI_GWAS_filtered$allele_alt <- unlist(lapply(stringr::str_split(NHGRI_GWAS_filtered$allele, "/"), "[[", 2))
+
+n_alt <- stringr::str_count(NHGRI_GWAS_filtered$allele, "/")
+NHGRI_GWAS_filtered_copy <- NHGRI_GWAS_filtered[which(n_alt > 1),]
+NHGRI_GWAS_filtered_copy$allele_alt <- unlist(lapply(stringr::str_split(NHGRI_GWAS_filtered_copy$allele, "/"), "[[", 3))
+NHGRI_GWAS_filtered <- rbind(NHGRI_GWAS_filtered, NHGRI_GWAS_filtered_copy)
+NHGRI_GWAS_filtered_copy <- NHGRI_GWAS_filtered[which(n_alt > 2),]
+NHGRI_GWAS_filtered_copy$allele_alt <- unlist(lapply(stringr::str_split(NHGRI_GWAS_filtered_copy$allele, "/"), "[[", 4))
+NHGRI_GWAS_filtered <- rbind(NHGRI_GWAS_filtered, NHGRI_GWAS_filtered_copy)
+NHGRI_GWAS_filtered <- NHGRI_GWAS_filtered[NHGRI_GWAS_filtered$allele_alt %in% c("A","C","G","T"),]
+
+NHGRI_GWAS_filtered$id <- with(NHGRI_GWAS_filtered, paste0(SNPS, ":", allele_ref, "/", allele_alt))
+NHGRI_GWAS_filtered <- NHGRI_GWAS_filtered[which(NHGRI_GWAS_filtered$CHR_POS != ""),]
+
+# write table for readQueryFile()
+NHGRI_query_formatted <- data.frame(id = NHGRI_GWAS_filtered$id,
+                                    chromosome = paste0("chr", NHGRI_GWAS_filtered$CHR_ID),
+                                    chrom_start = NHGRI_GWAS_filtered$CHR_POS,
+                                    strand = "x",
+                                    ref_allele = NHGRI_GWAS_filtered$allele_ref,
+                                    alt_allele = NHGRI_GWAS_filtered$allele_alt)
+
+write.table(NHGRI_query_formatted, file="GWAS_SNP_query.txt", 
+            sep="\t", row.names=FALSE, quote=FALSE)
+
+# format exon annotation
+t1 <- system.time({exons <- gtfToExons("gencode.v21.annotation.gtf")})
+
+t2 <- system.time({query <- readQueryFile("GWAS_SNP_query.txt", "SNP", exons)})
+t2.noFilter <- system.time({query <- readQueryFile("GWAS_SNP_query.txt", "SNP", exons, filter = F)})
 
 # predict branchpoints
-branchpointPredictions <- predictBranchpoints(query,
-                                        queryType = "SNP",
-                                        genome = "~/Downloads/GRCh38.p5.genome.fa",
-                                        bedtoolsLocation = bedtools)
+g <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+t3 <- system.time({branchpointPredictions <- predictBranchpoints(query,queryType = "SNP",BSgenome = g)})
 
 # filter for SNPs that create or delete branchpoints
-query <- predictionsToStats(query,branchpointPredictions)
-querySignificant <- query[query$created_n > 0 | query$deleted_n > 0]
-
-querySignificant@elementMetadata$U2_diff <- abs(querySignificant$max_U2_REF - querySignificant$max_U2_ALT)
-querySignificantTable <- arrange(as.data.frame(querySignificant@elementMetadata), plyr::desc(U2_diff))
-
-# plot rs17000647
-pdf("rs17000647_branchpoints.pdf", width = 8, height = 6)
-plotBranchpointWindow(querySignificantTable$id[1], branchpointPredictions,
-                      plotMutated = T,
-                      plotStructure = T, exons = exons)
-dev.off()
+t4 <- system.time({summary <- predictionsToSummary(query,branchpointPredictions)})
 

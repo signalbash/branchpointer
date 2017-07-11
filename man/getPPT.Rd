@@ -4,10 +4,10 @@
 \alias{getPPT}
 \title{Get the best polypyramidine tract}
 \usage{
-getPPT(attributesLine)
+getPPT(attributes)
 }
 \arguments{
-\item{attributesLine}{line from a query attributes GenomicRanges}
+\item{attributes}{query attributes GenomicRanges}
 }
 \value{
 distance to the start of the longest PPT, and its length
