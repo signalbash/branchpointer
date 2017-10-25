@@ -108,14 +108,18 @@ predictionsToSummary <- function(query,
   bps.ref <- bps.all[bps.all$status=="REF",]
   bps.alt <- bps.all[bps.all$status=="ALT",]
   
-  
   bps.ref$change.bySite <- (bps.ref$branchpoint_prob - 
     bps.alt$branchpoint_prob[match(bps.alt$id_site, bps.ref$id_site)])
+  bps.ref$alt_prob <-  bps.alt$branchpoint_prob[match(bps.alt$id_site, bps.ref$id_site)]
   
   deleted <- as.data.frame(table(bps.ref$id[
-    which(bps.ref$change.bySite > probabilityChange)]))
+    which(bps.ref$change.bySite > probabilityChange & 
+            bps.ref$alt_prob < probabilityCutoff & 
+            bps.ref$branchpoint_prob > probabilityCutoff)]))
   created <- as.data.frame(table(bps.ref$id[
-    which(bps.ref$change.bySite < (probabilityChange*-1))]))
+    which(bps.ref$change.bySite < (probabilityChange*-1) & 
+            bps.ref$alt_prob > probabilityCutoff & 
+            bps.ref$branchpoint_prob < probabilityCutoff)]))
   
   m <- match(query$id, deleted$Var1)
   query$deleted_n[which(!is.na(m))] <- deleted$Freq[m[which(!is.na(m))]]
