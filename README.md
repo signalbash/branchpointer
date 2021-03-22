@@ -40,7 +40,7 @@ Alternatively, an R BSgenome object can now be used (see vignette).
 
 **Author**: Beth Signal
 
-**Maintainer**: Beth Signal <b.signal@garvan.org.au>
+**Maintainer**: Beth Signal <beth.signal@gmail.com>
 
 **Description**: Predicts branchpoint probability for sites in intronic branchpoint windows. 
 queries can be supplied as intronic regions; or to evaluate the effects of mutations, SNPs.
