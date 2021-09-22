@@ -46,9 +46,17 @@ gtfToExons <- function(gtf){
   }
 
   exons <- gtf.rtrack
-  mcols(exons) <- mcols(exons)[,c("gene_id","gene_type",
-                                 "transcript_id","transcript_type",
-                                 "exon_id","exon_number")]
+
+  if("gene_type" %in%  colnames(mcols(exons)) &
+     "transcript_type" %in%  colnames(mcols(exons))){
+
+    mcols(exons) <- mcols(exons)[,c("gene_id","gene_type",
+                                   "transcript_id","transcript_type",
+                                   "exon_id","exon_number")]
+  }else{
+    mcols(exons) <- mcols(exons)[,c("gene_id", "transcript_id",
+                                    "exon_id", "exon_number")]
+  }
   # close connections
   gc()
 
